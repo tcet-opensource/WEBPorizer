@@ -3,7 +3,7 @@ import fs from 'fs'
 import http from 'http'
 import { Octokit, App  } from 'octokit'
 import { createNodeMiddleware } from '@octokit/webhooks'
-
+import convert from './convert.js'
 // Load environment variables from .env file
 dotenv.config()
 
@@ -64,12 +64,78 @@ app.webhooks.on('pull_request.closed', async ({ octokit, payload }) => {
   const appAuthor = payload.pull_request.user.login === 'webporizer[bot]';
 
   if (!appAuthor) {
+    let counter = 0;
+    async function createBranchAndMakeChanges(octokit, payload, newBranchName) {
+      
+      try {
+        const owner = payload.repository.owner.login;
+        const repo = payload.repository.name;
+        const baseBranchSha = payload.pull_request.base.sha;
+        const baseBranch = await octokit.rest.repos.getBranch({
+          owner,
+          repo,
+          branch: baseBranchSha
+        });
+        const baseTreeSha = baseBranch.data.commit.commit.tree.sha;
+    
+        // Create a new branch based on the base branch of the merged pull request
+        await octokit.rest.git.createRef({
+          owner,
+          repo,
+          ref: `refs/heads/${newBranchName}`,
+          sha: baseBranchSha
+        });
+        await octokit.rest.git.updateRef({
+          owner,
+          repo,
+          ref: `heads/${newBranchName}`,
+          sha: baseBranchSha,
+        });
+        
+        await convert();
+        // Continue with any other operations on the new branch
+        const commit  = await octokit.rest.git.createCommit({
+          owner,
+          repo,
+          message: 'Update codebase', 
+          tree: baseTreeSha, //
+          parents: [baseBranchSha], 
+        });
+
+        const newCommitSha = commit.data.sha;
+
+        await octokit.rest.git.updateRef({
+          owner,
+          repo,
+          ref: `heads/${newBranchName}`,
+          sha: newCommitSha, 
+        });
+      } catch (error) {
+        console.error(`Error in createBranchAndMakeChanges: ${error.message}`);
+        if (error.response) {
+          console.error(`Status: ${error.response.status}`);
+          console.error(`Response Data:`, error.response.data)
+      }
+    }
+  }
+
+
+function generateUniqueNumber() {
+  const timestamp = new Date().getTime();
+  const uniqueNumber = Math.floor(timestamp * 1000 + counter);
+  counter++;
+  return uniqueNumber;
+}
+
+const uniqueNumber1 = generateUniqueNumber();
+
   // Create a new branch and make changes
-  const newBranchName = 'testing-pr';
+  const newBranchName = 'WEBP0rizer-edit-'+uniqueNumber1;
   const prTitle = 'Pull Request Title';
 const prBody = 'Description of the pull request';
+await createBranchAndMakeChanges(octokit, payload, newBranchName);
  await createPullRequest(octokit, payload, newBranchName, prTitle, prBody);
-  await createBranchAndMakeChanges(octokit, payload, newBranchName);
+
   try {
     await octokit.rest.issues.createComment({
       owner: payload.repository.owner.login,
@@ -93,25 +159,6 @@ const prBody = 'Description of the pull request';
 });
 
 
-async function createBranchAndMakeChanges(octokit, payload, newBranchName) {
-  try {
-    const owner = payload.repository.owner.login;
-    const repo = payload.repository.name;
-    const baseBranchSha = payload.pull_request.base.sha;
-
-    // Create a new branch based on the base branch of the merged pull request
-    await octokit.git.createRef({
-      owner,
-      repo,
-      ref: `refs/heads/${newBranchName}`,
-      sha: baseBranchSha
-    });
-    
-    // Continue with any other operations on the new branch
-  } catch (error) {
-    console.error(`Error in createBranchAndMakeChanges: ${error.message}`);
-  }
-}
 
 
 // Optional: Handle errors
@@ -161,5 +208,3 @@ async function createPullRequest(octokit, payload, newBranchName, title, body) {
     console.error(`Error creating pull request: ${error.message}`);
   }
 }
-
-// ... (existing code)
