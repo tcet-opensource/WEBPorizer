@@ -1,11 +1,13 @@
-const fs = require('fs');
-const path = require('path');
-const sharp = require('sharp');
-const { promisify } = require('util');
+import * as fs from 'fs';
+import * as path from 'path';
+import sharp from 'sharp';
+import { promisify } from 'util';
+
 const readdir = promisify(fs.readdir);
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 const stat = promisify(fs.stat);
+
 
 // Function to convert an image to WebP and save it in the same location
 async function convertToWebp(inputFile) {
@@ -83,8 +85,8 @@ async function processDirectory(directory) {
 const imageCodeDirectory = 'C:/Users/Rahul/Documents/rahulvsc/tcet-opensource/webporizerjs';
 
 // Main function to start processing
-async function main() {
+async function convert() {
     await processDirectory(imageCodeDirectory);
 }
 
-
+export default convert;

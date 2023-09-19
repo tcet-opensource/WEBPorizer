@@ -71,12 +71,12 @@ app.webhooks.on('pull_request.closed', async ({ octokit, payload }) => {
         const owner = payload.repository.owner.login;
         const repo = payload.repository.name;
         const baseBranchSha = payload.pull_request.base.sha;
-        const baseBranch = await octokit.rest.repos.getBranch({
+        const baseTree = await octokit.rest.git.getTree({
           owner,
           repo,
-          branch: baseBranchSha
+          tree_sha: baseBranchSha
         });
-        const baseTreeSha = baseBranch.data.commit.commit.tree.sha;
+        const baseTreeSha = baseTree.data.sha;
     
         // Create a new branch based on the base branch of the merged pull request
         await octokit.rest.git.createRef({
